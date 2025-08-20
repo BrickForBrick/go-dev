@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 
+	"go-dev/docs"
 	"go-dev/internal/database"
 	"go-dev/internal/handlers"
 	"go-dev/internal/middleware"
@@ -12,8 +13,15 @@ import (
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
+// @title Subscription Management API
+// @version 1.0
+// @description REST API для управления подписками пользователей
+// @host localhost:8080
+// @BasePath /api/v1
 func main() {
 	dbURL := os.Getenv("DATABASE_URL")
 	port := os.Getenv("PORT")
@@ -43,6 +51,10 @@ func main() {
 	router.Use(gin.Recovery())
 	router.Use(middleware.CORS())
 
+	// Swagger
+	docs.SwaggerInfo.BasePath = "/api/v1"
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
 	router.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{"message": "pong"})
 	})
@@ -65,6 +77,7 @@ func main() {
 	}
 
 	log.Println("Server running on port", port)
+	log.Println("Swagger documentation available at: http://localhost:" + port + "/swagger/index.html")
 	if err := router.Run(":" + port); err != nil {
 		log.Fatal("Failed to start server:", err)
 	}
