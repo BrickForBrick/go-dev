@@ -24,6 +24,16 @@ func NewSubscriptionHandler(service *service.SubscriptionService, logger *logrus
 }
 
 // Create создает новую подписку
+// @Summary Создать подписку
+// @Description Создает новую подписку пользователя
+// @Tags subscriptions
+// @Accept json
+// @Produce json
+// @Param subscription body models.CreateSubscriptionRequest true "Данные подписки"
+// @Success 201 {object} models.Subscription
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /subscriptions [post]
 func (h *SubscriptionHandler) Create(c *gin.Context) {
 	var req models.CreateSubscriptionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -50,12 +60,23 @@ func (h *SubscriptionHandler) Create(c *gin.Context) {
 }
 
 // GetByID получает подписку по ID
+// @Summary Получить подписку по ID
+// @Description Возвращает подписку по указанному ID
+// @Tags subscriptions
+// @Produce json
+// @Param id path int true "ID подписки"
+// @Success 200 {object} models.Subscription
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /subscriptions/{id} [get]
 func (h *SubscriptionHandler) GetByID(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID format"})
 		return
 	}
+
+	h.logger.WithField("subscription_id", id).Info("Getting subscription by ID")
 
 	subscription, err := h.service.GetByID(id)
 	if err != nil {
@@ -68,6 +89,18 @@ func (h *SubscriptionHandler) GetByID(c *gin.Context) {
 }
 
 // List возвращает список подписок
+// @Summary Получить список подписок
+// @Description Возвращает список подписок с возможностью фильтрации
+// @Tags subscriptions
+// @Produce json
+// @Param user_id query string false "UUID пользователя"
+// @Param service_name query string false "Название сервиса"
+// @Param limit query int false "Лимит записей"
+// @Param offset query int false "Смещение"
+// @Success 200 {array} models.Subscription
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /subscriptions [get]
 func (h *SubscriptionHandler) List(c *gin.Context) {
 	var userID *uuid.UUID
 	if userIDStr := c.Query("user_id"); userIDStr != "" {
@@ -87,6 +120,13 @@ func (h *SubscriptionHandler) List(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.Query("limit"))
 	offset, _ := strconv.Atoi(c.Query("offset"))
 
+	h.logger.WithFields(logrus.Fields{
+		"user_id":      userID,
+		"service_name": serviceName,
+		"limit":        limit,
+		"offset":       offset,
+	}).Info("Listing subscriptions")
+
 	subscriptions, err := h.service.List(userID, serviceName, limit, offset)
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to list subscriptions")
@@ -98,6 +138,17 @@ func (h *SubscriptionHandler) List(c *gin.Context) {
 }
 
 // Update обновляет подписку
+// @Summary Обновить подписку
+// @Description Обновляет существующую подписку
+// @Tags subscriptions
+// @Accept json
+// @Produce json
+// @Param id path int true "ID подписки"
+// @Param subscription body models.UpdateSubscriptionRequest true "Данные для обновления"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /subscriptions/{id} [put]
 func (h *SubscriptionHandler) Update(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -111,6 +162,8 @@ func (h *SubscriptionHandler) Update(c *gin.Context) {
 		return
 	}
 
+	h.logger.WithField("subscription_id", id).Info("Updating subscription")
+
 	err = h.service.Update(id, &req)
 	if err != nil {
 		h.logger.WithError(err).WithField("id", id).Error("Failed to update subscription")
@@ -123,12 +176,23 @@ func (h *SubscriptionHandler) Update(c *gin.Context) {
 }
 
 // Delete удаляет подписку
+// @Summary Удалить подписку
+// @Description Удаляет подписку по ID
+// @Tags subscriptions
+// @Produce json
+// @Param id path int true "ID подписки"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /subscriptions/{id} [delete]
 func (h *SubscriptionHandler) Delete(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID format"})
 		return
 	}
+
+	h.logger.WithField("subscription_id", id).Info("Deleting subscription")
 
 	err = h.service.Delete(id)
 	if err != nil {
@@ -142,6 +206,18 @@ func (h *SubscriptionHandler) Delete(c *gin.Context) {
 }
 
 // GetTotalCost подсчитывает общую стоимость подписок
+// @Summary Получить общую стоимость подписок
+// @Description Подсчитывает общую стоимость подписок за период с фильтрацией
+// @Tags subscriptions
+// @Produce json
+// @Param start_period query string true "Начальный период (MM-YYYY)"
+// @Param end_period query string true "Конечный период (MM-YYYY)"
+// @Param user_id query string false "UUID пользователя"
+// @Param service_name query string false "Название сервиса"
+// @Success 200 {object} models.TotalCostResponse
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /subscriptions/total-cost [get]
 func (h *SubscriptionHandler) GetTotalCost(c *gin.Context) {
 	startPeriod := c.Query("start_period")
 	endPeriod := c.Query("end_period")
@@ -180,5 +256,6 @@ func (h *SubscriptionHandler) GetTotalCost(c *gin.Context) {
 		return
 	}
 
+	h.logger.WithField("total_cost", result.TotalCost).Info("Total cost calculated successfully")
 	c.JSON(http.StatusOK, result)
 }
