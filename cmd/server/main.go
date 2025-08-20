@@ -1,96 +1,56 @@
 package main
 
 import (
-	"go-dev/internal/config"
+	"log"
+	"os"
+
 	"go-dev/internal/database"
 	"go-dev/internal/handlers"
 	"go-dev/internal/middleware"
 	"go-dev/internal/repository"
 	"go-dev/internal/service"
-	"log"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
+	_ "github.com/lib/pq"
 )
 
-// @title Subscription Management API
-// @version 1.0
-// @description REST API для управления подписками пользователей
-// @host localhost:8080
-// @BasePath /api/v1
 func main() {
-	// Загрузка конфигурации
-	cfg, err := config.Load()
-	if err != nil {
-		log.Fatal("Failed to load config:", err)
+	dbURL := os.Getenv("DATABASE_URL")
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
 	}
 
-	// Настройка логгера
-	logger := logrus.New()
-	logger.SetFormatter(&logrus.JSONFormatter{})
-	logger.SetLevel(logrus.InfoLevel)
-	if cfg.Server.Environment == "development" {
-		logger.SetLevel(logrus.DebugLevel)
-		logger.SetFormatter(&logrus.TextFormatter{
-			FullTimestamp: true,
-			ForceColors:   true,
-		})
-	}
-
-	logger.WithFields(logrus.Fields{
-		"environment": cfg.Server.Environment,
-		"port":        cfg.Server.Port,
-	}).Info("Starting subscription service")
-
-	// Подключение к базе данных
-	db, err := database.Connect(cfg.Database.URL)
+	// Подключение к базе
+	db, err := database.Connect(dbURL)
 	if err != nil {
-		logger.Fatal("Failed to connect to database:", err)
+		log.Fatal("Failed to connect to database:", err)
 	}
 	defer db.Close()
 
-	logger.Info("Database connected successfully")
-
-	// Запуск миграций
-	if err := database.RunMigrations(cfg.Database.URL); err != nil {
-		logger.Fatal("Failed to run migrations:", err)
+	// Миграции
+	if err := database.RunMigrations(dbURL); err != nil {
+		log.Fatal("Failed to run migrations:", err)
 	}
 
-	logger.Info("Database migrations completed")
-
-	// Инициализация слоев приложения
+	// Репозитории и сервисы
 	subscriptionRepo := repository.NewSubscriptionRepository(db)
 	subscriptionService := service.NewSubscriptionService(subscriptionRepo)
-	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionService, logger)
+	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionService, nil)
 
-	// Настройка роутера
-	if cfg.Server.Environment == "production" {
-		gin.SetMode(gin.ReleaseMode)
-	}
-
+	// Роутер
 	router := gin.New()
 	router.Use(gin.Recovery())
-	router.Use(middleware.Logger(logger))
 	router.Use(middleware.CORS())
 
-	// Swagger
-	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-
-	// Простейшие проверочные endpoints
 	router.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{"message": "pong"})
 	})
 
-	// API маршруты
 	api := router.Group("/api/v1")
 	{
 		api.GET("/health", func(c *gin.Context) {
-			c.JSON(200, gin.H{
-				"status":  "ok",
-				"service": "subscription-service",
-			})
+			c.JSON(200, gin.H{"status": "ok"})
 		})
 
 		subscriptions := api.Group("/subscriptions")
@@ -104,19 +64,8 @@ func main() {
 		}
 	}
 
-	logger.Infof("Server starting on port %s", cfg.Server.Port)
-	logger.Info("Available endpoints:")
-	logger.Info("  GET    /ping")
-	logger.Info("  GET    /swagger/index.html")
-	logger.Info("  GET    /api/v1/health")
-	logger.Info("  POST   /api/v1/subscriptions")
-	logger.Info("  GET    /api/v1/subscriptions")
-	logger.Info("  GET    /api/v1/subscriptions/:id")
-	logger.Info("  PUT    /api/v1/subscriptions/:id")
-	logger.Info("  DELETE /api/v1/subscriptions/:id")
-	logger.Info("  GET    /api/v1/subscriptions/total-cost")
-
-	if err := router.Run(":" + cfg.Server.Port); err != nil {
-		logger.Fatal("Failed to start server:", err)
+	log.Println("Server running on port", port)
+	if err := router.Run(":" + port); err != nil {
+		log.Fatal("Failed to start server:", err)
 	}
 }

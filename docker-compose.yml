@@ -5,15 +5,15 @@ services:
     image: postgres:15-alpine
     container_name: subscription_db
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
-      POSTGRES_DB: ${POSTGRES_DB:-subscriptions}
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: subscriptions
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user}"]
+      test: ["CMD-SHELL", "pg_isready -U user"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -27,12 +27,9 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      - DATABASE_URL=postgres://user:password@postgres:5432/subscriptions?sslmode=disable
-      - PORT=8080
-      - ENVIRONMENT=production
-    volumes:
-      - .:/app
-    working_dir: /app
+      DATABASE_URL: postgres://user:password@postgres:5432/subscriptions?sslmode=disable
+      PORT: 8080
+    restart: always
 
 volumes:
   postgres_data:
