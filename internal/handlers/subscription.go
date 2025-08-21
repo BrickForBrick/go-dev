@@ -17,12 +17,18 @@ type SubscriptionHandler struct {
 }
 
 func NewSubscriptionHandler(service *service.SubscriptionService, logger *logrus.Logger) *SubscriptionHandler {
+	// Если логгер не передан, создаем дефолтный
+	if logger == nil {
+		logger = logrus.New()
+	}
+
 	return &SubscriptionHandler{
 		service: service,
 		logger:  logger,
 	}
 }
 
+// Остальной код остается тот же...
 // Create создает новую подписку
 // @Summary Создать подписку
 // @Description Создает новую подписку пользователя

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"os"
 
 	"go-dev/docs"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
+	"github.com/sirupsen/logrus"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
@@ -23,33 +23,50 @@ import (
 // @host localhost:8080
 // @BasePath /api/v1
 func main() {
+	// Настройка логгера
+	logger := logrus.New()
+	logger.SetFormatter(&logrus.TextFormatter{
+		FullTimestamp: true,
+	})
+	logger.SetLevel(logrus.InfoLevel)
+
 	dbURL := os.Getenv("DATABASE_URL")
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 
+	logger.WithFields(logrus.Fields{
+		"port":         port,
+		"database_url": dbURL,
+	}).Info("Starting subscription service")
+
 	// Подключение к базе
 	db, err := database.Connect(dbURL)
 	if err != nil {
-		log.Fatal("Failed to connect to database:", err)
+		logger.WithError(err).Fatal("Failed to connect to database")
 	}
 	defer db.Close()
 
+	logger.Info("Connected to database successfully")
+
 	// Миграции
 	if err := database.RunMigrations(dbURL); err != nil {
-		log.Fatal("Failed to run migrations:", err)
+		logger.WithError(err).Fatal("Failed to run migrations")
 	}
+
+	logger.Info("Database migrations completed")
 
 	// Репозитории и сервисы
 	subscriptionRepo := repository.NewSubscriptionRepository(db)
 	subscriptionService := service.NewSubscriptionService(subscriptionRepo)
-	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionService, nil)
+	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionService, logger)
 
 	// Роутер
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.Use(middleware.CORS())
+	router.Use(middleware.Logger(logger))
 
 	// Swagger
 	docs.SwaggerInfo.BasePath = "/api/v1"
@@ -76,9 +93,10 @@ func main() {
 		}
 	}
 
-	log.Println("Server running on port", port)
-	log.Println("Swagger documentation available at: http://localhost:" + port + "/swagger/index.html")
+	logger.WithField("port", port).Info("Server starting")
+	logger.Info("Swagger documentation available at: http://localhost:" + port + "/swagger/index.html")
+
 	if err := router.Run(":" + port); err != nil {
-		log.Fatal("Failed to start server:", err)
+		logger.WithError(err).Fatal("Failed to start server")
 	}
 }
