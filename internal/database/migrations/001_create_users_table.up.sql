@@ -10,10 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- Создание индексов
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 
--- Исправление типа user_id в таблице subscriptions обратно на UUID
-ALTER TABLE subscriptions ALTER COLUMN user_id TYPE UUID USING user_id::UUID;
-
--- Добавление внешнего ключа
-ALTER TABLE subscriptions 
-ADD CONSTRAINT fk_subscriptions_user_id 
-FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+-- Комментарии для документации
+COMMENT ON TABLE users IS 'Таблица пользователей системы';
+COMMENT ON COLUMN users.id IS 'Уникальный идентификатор пользователя (UUID)';
+COMMENT ON COLUMN users.email IS 'Email пользователя (уникальный)';

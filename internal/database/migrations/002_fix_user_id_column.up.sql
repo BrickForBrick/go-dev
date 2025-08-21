@@ -1,1 +1,0 @@
-ALTER TABLE subscriptions ALTER COLUMN user_id TYPE VARCHAR(7);
