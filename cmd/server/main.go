@@ -57,10 +57,17 @@ func main() {
 
 	logger.Info("Database migrations completed")
 
-	// Репозитории и сервисы
+	// Репозитории
 	subscriptionRepo := repository.NewSubscriptionRepository(db)
+	userRepo := repository.NewUserRepository(db)
+
+	// Сервисы
 	subscriptionService := service.NewSubscriptionService(subscriptionRepo)
+	userService := service.NewUserService(userRepo)
+
+	// Обработчики
 	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionService, logger)
+	userHandler := handlers.NewUserHandler(userService, logger)
 
 	// Роутер
 	router := gin.New()
@@ -82,6 +89,17 @@ func main() {
 			c.JSON(200, gin.H{"status": "ok"})
 		})
 
+		// Users endpoints
+		users := api.Group("/users")
+		{
+			users.POST("", userHandler.Create)
+			users.GET("", userHandler.List)
+			users.GET("/:id", userHandler.GetByID)
+			users.PUT("/:id", userHandler.Update)
+			users.DELETE("/:id", userHandler.Delete)
+		}
+
+		// Subscriptions endpoints
 		subscriptions := api.Group("/subscriptions")
 		{
 			subscriptions.POST("", subscriptionHandler.Create)
